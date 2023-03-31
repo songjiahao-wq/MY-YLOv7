@@ -1,0 +1,1 @@
+找到loss.py文件，搜索CIoU=True，将CIoU全部改为SIoU即可
