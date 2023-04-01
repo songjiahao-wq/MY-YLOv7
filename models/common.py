@@ -2189,3 +2189,41 @@ def drop_path_f(x, drop_prob: float = 0., training: bool = False):
     random_tensor.floor_()  # binarize
     output = x.div(keep_prob) * random_tensor
     return output
+
+#SPPFC**************************************
+"""通过多个串行卷积层"""
+def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, groups=1):
+    """standard convolution with padding"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
+                     padding=padding, dilation=dilation, groups=groups, bias=False)
+class SPPFC(nn.Module):
+    # Spatial Pyramid Pooling - Fast (SPPF) layer for YOLOv5 by Glenn Jocher
+    def __init__(self, c1, c2, k=[3,3,3] , reduction=16, group=True, conv_groups=[4, 8, 16,32]):  # equivalent to SPP(k=(5, 9, 13))
+        super(SPPFC, self).__init__()
+        c_ = c1 // 2  # hidden channels
+        self.cv1 = conv(c1, c_, 1, 1)
+        # self.cv1 = conv(c1, c2 // reduction, 1, 1)
+        self.cv2 = conv(c_ * (1 + len(k)), c2 // reduction, 1, 1)
+        # self.cv2 = conv((c2 // reduction) * (1 + len(k)), c2 // reduction, 1, 1)
+        if not group:
+            self.m = nn.ModuleList(conv(c_, c_, k[i],padding=k[i]//2) for i in range(len(k)))
+        else:
+            self.m = nn.ModuleList(conv(c_, c_, k[i], padding=k[i] // 2,groups=conv_groups[i]) for i in range(len(k)))
+        self.fc = nn.Sequential(
+            nn.Linear(c2 // reduction , c2 // reduction, bias=False),
+            nn.ReLU(),
+            nn.Linear(c2 // reduction, c2, bias=False),
+            nn.Sigmoid()
+        )
+        self.avg_pool1 = nn.AdaptiveAvgPool2d(1)
+
+    def forward(self, x):
+        b, c, _, _ = x.shape
+        x1 = self.cv1(x)
+        z = list(torch.unsqueeze(x1, dim=0))
+
+        z.extend(m(z[-1]) for m in self.m)
+        out = self.cv2(torch.cat(z, 1))
+        out = self.avg_pool1(out).reshape((b, -1))
+        weight = self.fc(out).view(b, c, 1, 1)
+        return x * weight
