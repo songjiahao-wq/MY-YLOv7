@@ -534,7 +534,7 @@ class Model(nn.Module):
         m = self.model[-1]  # Detect()
         if isinstance(m, Detect):
             s = 256  # 2x min stride
-            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))])  # forward
+            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(2, ch, s, s))])  # forward
             check_anchor_order(m)
             m.anchors /= m.stride.view(-1, 1, 1)
             self.stride = m.stride
@@ -542,7 +542,7 @@ class Model(nn.Module):
             # print('Strides: %s' % m.stride.tolist())
         if isinstance(m, IDetect):
             s = 256  # 2x min stride
-            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))])  # forward
+            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(2, ch, s, s))])  # forward
             check_anchor_order(m)
             m.anchors /= m.stride.view(-1, 1, 1)
             self.stride = m.stride
@@ -550,7 +550,7 @@ class Model(nn.Module):
             # print('Strides: %s' % m.stride.tolist())
         if isinstance(m, IAuxDetect):
             s = 256  # 2x min stride
-            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))[:4]])  # forward
+            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(2, ch, s, s))[:4]])  # forward
             #print(m.stride)
             check_anchor_order(m)
             m.anchors /= m.stride.view(-1, 1, 1)
@@ -559,7 +559,7 @@ class Model(nn.Module):
             # print('Strides: %s' % m.stride.tolist())
         if isinstance(m, IBin):
             s = 256  # 2x min stride
-            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))])  # forward
+            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(2, ch, s, s))])  # forward
             check_anchor_order(m)
             m.anchors /= m.stride.view(-1, 1, 1)
             self.stride = m.stride
@@ -567,7 +567,7 @@ class Model(nn.Module):
             # print('Strides: %s' % m.stride.tolist())
         if isinstance(m, IKeypoint):
             s = 256  # 2x min stride
-            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))])  # forward
+            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(2, ch, s, s))])  # forward
             check_anchor_order(m)
             m.anchors /= m.stride.view(-1, 1, 1)
             self.stride = m.stride
@@ -615,7 +615,7 @@ class Model(nn.Module):
             if profile:
                 c = isinstance(m, (Detect, IDetect, IAuxDetect, IBin))
                 o = thop.profile(m, inputs=(x.copy() if c else x,), verbose=False)[0] / 1E9 * 2 if thop else 0  # FLOPS
-                for _ in range(10):
+                for _ in range(20):
                     m(x.copy() if c else x)
                 t = time_synchronized()
                 for _ in range(10):
@@ -741,6 +741,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
     no = na * (nc + 5)  # number of outputs = anchors * (classes + 5)
 
     layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
+    GHOSTBottleneck_layers, widths = [], []
     for i, (f, n, m, args) in enumerate(d['backbone'] + d['head']):  # from, number, module, args
         m = eval(m) if isinstance(m, str) else m  # eval strings
         for j, a in enumerate(args):
@@ -749,7 +750,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             except:
                 pass
 
-        n = max(round(n * gd), 1) if n > 1 else n  # depth gain
+        n = n_ = max(round(n * gd), 1) if n > 1 else n  # depth gain
         if m in [nn.Conv2d, Conv, RobustConv, RobustConv2, DWConv, GhostConv, RepConv, RepConv_OREPA, DownC, 
                  SPP, SPPF, SPPCSPC, GhostSPPCSPC, MixConv2d, Focus, Stem, GhostStem, CrossConv, 
                  Bottleneck, BottleneckCSPA, BottleneckCSPB, BottleneckCSPC, 
@@ -760,13 +761,13 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
                  RepResX, RepResXCSPA, RepResXCSPB, RepResXCSPC, 
                  Ghost, GhostCSPA, GhostCSPB, GhostCSPC,
                  SwinTransformerBlock, STCSPA, STCSPB, STCSPC,
-                 SwinTransformer2Block, ST2CSPA, ST2CSPB, ST2CSPC, SE_SPPFCSPC, ConvNextBlock,ACmix, SPPFC]:
+                 SwinTransformer2Block, ST2CSPA, ST2CSPB, ST2CSPC, SE_SPPFCSPC, ConvNextBlock, ACmix, SPPFC]:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
                 c2 = make_divisible(c2 * gw, 8)
 
             args = [c1, c2, *args[1:]]
-            if m in [DownC, SPPCSPC, GhostSPPCSPC, SE_SPPFCSPC,
+            if m in [DownC, GhostSPPCSPC, SE_SPPFCSPC,
                      BottleneckCSPA, BottleneckCSPB, BottleneckCSPC, 
                      RepBottleneckCSPA, RepBottleneckCSPB, RepBottleneckCSPC, 
                      ResCSPA, ResCSPB, ResCSPC, 
@@ -776,8 +777,17 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
                      GhostCSPA, GhostCSPB, GhostCSPC,
                      STCSPA, STCSPB, STCSPC,
                      ST2CSPA, ST2CSPB, ST2CSPC]:
+
                 args.insert(2, n)  # number of repeats
                 n = 1
+        elif m is GGhostRegNet:
+            widths.append(args[0])
+            if args[1] != 0:
+                widths[-2] = ch[f]
+            block = GHOSTBottleneck
+            GHOSTBottleneck_layers.append(n)
+            args = [block, GHOSTBottleneck_layers, widths, args[1]]
+            n = 1
         elif m is nn.BatchNorm2d:
             args = [ch[f]]
         elif m is Concat:
@@ -801,7 +811,8 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         else:
             c2 = ch[f]
 
-        m_ = nn.Sequential(*[m(*args) for _ in range(n)]) if n > 1 else m(*args)  # module
+        # m_ = nn.Sequential(*[m(*args) for _ in range(n)]) if n > 1 else m(*args)  # module
+        m_ = nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)
         t = str(m)[8:-2].replace('__main__.', '')  # module type
         np = sum([x.numel() for x in m_.parameters()])  # number params
         m_.i, m_.f, m_.type, m_.np = i, f, t, np  # attach index, 'from' index, type, number params
@@ -816,7 +827,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', type=str, default=r'../cfg/training/yolov7-tiny.yaml', help='model.yaml')
+    parser.add_argument('--cfg', type=str, default=r'../cfg/training/yolov7-convnext-B.yaml', help='model.yaml')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--profile', action='store_true', help='profile model speed')
     opt = parser.parse_args()
