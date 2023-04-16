@@ -71,7 +71,7 @@ def test(data,
     model.eval()
     if isinstance(data, str):
         is_coco = data.endswith('coco.yaml')
-        with open(data) as f:
+        with open(data,encoding='utf-8') as f:
             data = yaml.load(f, Loader=yaml.SafeLoader)
     check_dataset(data)  # check
     nc = 1 if single_cls else int(data['nc'])  # number of classes
@@ -289,9 +289,9 @@ def test(data,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='test.py')
-    parser.add_argument('--weights', nargs='+', type=str, default='yolov7_MY.pt', help='model.pt path(s)')
-    parser.add_argument('--data', type=str, default='data/coco.yaml', help='*.data path')
-    parser.add_argument('--batch-size', type=int, default=32, help='size of each image batch')
+    parser.add_argument('--weights', nargs='+', type=str, default='runs/train/exp11/weights/best.pt', help='model.pt path(s)')
+    parser.add_argument('--data', type=str, default='data/Custom/my_data.yaml', help='*.data path')
+    parser.add_argument('--batch-size', type=int, default=1, help='size of each image batch')
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.001, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.65, help='IOU threshold for NMS')
