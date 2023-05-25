@@ -2480,3 +2480,53 @@ class GGhostRegNet(nn.Module):
 
     def forward(self, x):
         return self._forward_impl(x)
+#  重构YOLOv7-----------------------------------------------------------------------------
+class ELAN(nn.Module):
+    def __init__(self, c1, c2, mode=1):
+        super().__init__()
+
+        c_ = c1 // 2
+        if mode == 2:
+            c_ = c1 // 4
+        self.conv1 = Conv(c1, c_, 1, 1)
+        self.conv2 = Conv(c1, c_, 1, 1)
+
+        self.conv3 = Conv(c_, c_, 3, 1)
+        self.conv4 = Conv(c_, c_, 3, 1)
+        self.conv5 = Conv(c_, c_, 3, 1)
+        self.conv6 = Conv(c_, c_, 3, 1)
+
+        self.conv7 = Conv(c_ * 4, c2, 1, 1)
+    def forward(self, x):
+        shotcut = self.conv1(x)
+        y1 = self.conv2(x)
+        y2 = self.conv4(self.conv3(y1))
+        y3 = self.conv6(self.conv5(y2))
+
+        return self.conv7(torch.cat((shotcut, y1, y2, y3),dim=1))
+
+class ELAN_H(nn.Module):
+    def __init__(self, c1, c2):
+        super().__init__()
+
+        c_ = c1 // 2
+        c_2 = c1 // 4
+
+        self.conv1 = Conv(c1, c2, 1, 1)
+        self.conv2 = Conv(c1, c2, 1, 1)
+
+        self.conv3 = Conv(c2, c_2, 3, 1)
+        self.conv4 = Conv(c_2, c_2, 3, 1)
+        self.conv5 = Conv(c_2, c_2, 3, 1)
+        self.conv6 = Conv(c_2, c_2, 3, 1)
+
+        self.conv7 = Conv(c_2 * 4+ c_ * 2, c2, 1, 1)
+    def forward(self, x):
+        shotcut = self.conv1(x)
+        y = self.conv2(x)
+        y1 = self.conv3(y)
+        y2 = self.conv4(y1)
+        y3 = self.conv5(y2)
+        y4 = self.conv6(y3)
+
+        return self.conv7(torch.cat((shotcut, y, y1, y2, y3, y4),dim=1))
