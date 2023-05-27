@@ -2530,6 +2530,36 @@ class ELAN_H(nn.Module):
         y4 = self.conv6(y3)
 
         return self.conv7(torch.cat((shotcut, y, y1, y2, y3, y4),dim=1))
+class MP_1(nn.Module):
+    # c -> c
+    def __init__(self,c1, c2, k=2):
+        super(MP_1, self).__init__()
+        c_ = c1 // 2
+        self.m = nn.MaxPool2d(kernel_size=k, stride=k)
+        self.conv1 = Conv(c1, c_, 1, 1)
+        self.conv2 = Conv(c1, c_, 1, 1)
+        self.conv3 = Conv(c_, c_, 3, 2)
+
+    def forward(self, x):
+        y1 = self.conv1(self.m(x))
+        y2 = self.conv3(self.conv2(x))
+        return torch.cat((y1, y2), dim=1)
+
+class MP_2(nn.Module):
+    # c -> 2c
+    def __init__(self, c1, c2, k=2):
+        super(MP_2, self).__init__()
+
+        self.m = nn.MaxPool2d(kernel_size=k, stride=k)
+        self.conv1 = Conv(c1, c1, 1, 1)
+        self.conv2 = Conv(c1, c1, 1, 1)
+        self.conv3 = Conv(c1, c1, 3, 2)
+
+    def forward(self, x):
+        y1 = self.conv1(self.m(x))
+        y2 = self.conv3(self.conv2(x))
+        return torch.cat((y1, y2), dim=1)
+
 #bifpn----------------------------------------------------------------------------------------------------
 class SwishImplementation(torch.autograd.Function):
     @staticmethod
