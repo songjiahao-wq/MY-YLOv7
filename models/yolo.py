@@ -761,7 +761,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
                  RepResX, RepResXCSPA, RepResXCSPB, RepResXCSPC, 
                  Ghost, GhostCSPA, GhostCSPB, GhostCSPC,
                  SwinTransformerBlock, STCSPA, STCSPB, STCSPC,
-                 SwinTransformer2Block, ST2CSPA, ST2CSPB, ST2CSPC, SE_SPPFCSPC, ConvNextBlock, ACmix, SPPFC,
+                 SwinTransformer2Block, ST2CSPA, ST2CSPB, ST2CSPC, SE_SPPFCSPC, ConvNextBlock, ACmix, SPPFC,CBAMConv,
                  ELAN, ELAN_H, MP_1, MP_2]:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
@@ -793,8 +793,6 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             args = [ch[f]]
         elif m is Concat:
             c2 = sum([ch[x] for x in f])
-        elif m is Concat_bifpn:
-            c2 = max([ch[x] for x in f])
         elif m is Chuncat:
             c2 = sum([ch[x] for x in f])
         elif m is Shortcut:

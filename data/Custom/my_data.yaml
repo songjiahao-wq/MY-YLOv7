@@ -8,11 +8,11 @@
 
 
 # train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-train: F:\sjh\DATA2\xianyu\paper_data\seg\images\train # 118287 images
-val: F:\sjh\DATA2\xianyu\paper_data\seg\images\val # 5000 images
-test: F:\sjh\DATA2\xianyu\paper_data\seg\images\val # 20288 of 40670 images, submit to https://competitions.codalab.org/competitions/20794
+train: F:\sjh\DATA\wider+crowd\images\test # 118287 images
+val: F:\sjh\DATA\wider+crowd\images\val # 5000 images
+test: F:\sjh\DATA\wider+crowd\images\val # 20288 of 40670 images, submit to https://competitions.codalab.org/competitions/20794
 nc: 1
 # class names
-names: [ 'tea-oil tree']
+names: ['person']
 
 

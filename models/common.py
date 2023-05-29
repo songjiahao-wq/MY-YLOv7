@@ -2480,6 +2480,37 @@ class GGhostRegNet(nn.Module):
 
     def forward(self, x):
         return self._forward_impl(x)
+class CBAMConv(nn.Module):
+    def __init__(self, channel, out_channel, kernel_size, stride, reduction=16, spatial_kernel=7):
+        super().__init__()
+
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.mlp = nn.Sequential(
+            nn.Conv2d(channel, channel // reduction, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(channel // reduction, channel, 1, bias=False)
+        )
+
+        self.spatital = nn.Conv2d(2, 1, kernel_size=spatial_kernel,
+                                  padding=spatial_kernel // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+        self.conv = nn.Sequential(nn.Conv2d(channel, out_channel, kernel_size, padding=kernel_size // 2, stride=stride),
+                                  nn.BatchNorm2d(out_channel),
+                                  nn.ReLU())
+
+    def forward(self, x):
+        max_out = self.mlp(self.max_pool(x))
+        avg_out = self.mlp(self.avg_pool(x))
+        channel_out = self.sigmoid(max_out + avg_out)
+        x = channel_out * x
+
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        spatial_out = self.sigmoid(self.spatital(torch.cat([max_out, avg_out], dim=1)))
+        x = spatial_out * x
+        return self.conv(x)
 #  重构YOLOv7-----------------------------------------------------------------------------
 class ELAN(nn.Module):
     def __init__(self, c1, c2, mode=1):
